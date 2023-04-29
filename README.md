@@ -419,6 +419,14 @@ When creating a PersistentVolume, always configure a PersistentVolumeClaim (PVCs
 Avoid including PVs in container configuration as this strongly pairs a container to a particular volume.
 Always specify a default StorageClass, otherwise PVCs without a specific class will fail.
 
-## Notes
+## Bibliography
 
-This document is not finalized.
+- [7 Kubernetes Best Practices](https://www.plural.sh/blog/7-kubernetes-best-practices/)
+- [10 Kubernetes Best Practices to Get You Started](https://www.densify.com/kubernetes-tools/kubernetes-best-practices/)
+- [15 Kubernetes Best Practices Every Developer Should Know](https://spacelift.io/blog/kubernetes-best-practices)
+- [20 Kubernetes Best Practices](https://www.eweek.com/cloud/kubernetes-best-practices/)
+- [Best Practices in Kubernetes Security](https://www.okteto.com/blog/best-practices-in-kubernetes-security/)
+- [Kubernetes production best practices](https://learnk8s.io/production-best-practices)
+- [Kubernetes Security Best Practices](https://www.aquasec.com/cloud-native-academy/kubernetes-in-production/kubernetes-security-best-practices-10-steps-to-securing-k8s/)
+- [Kubernetes Best Practices](https://www.opsramp.com/guides/why-kubernetes/kubernetes-best-practices/)
+- [Kubernetes Best Practices For 2023](https://www.cloudzero.com/blog/kubernetes-best-practices)
