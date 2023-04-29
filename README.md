@@ -13,10 +13,10 @@
 9. [Use smaller images]()
 10. [Update images frequently]()
 11. [Use a private registry]()
-12. [Use network policies]()
-13. [Use a firewall]()
-14. [Use process whitelisting]()
-15. [Use declarative YAML files]()
+12. [Use declarative YAML files]()
+13. [Use network policies]()
+14. [Use a firewall]()
+15. [Use process whitelisting]()
 16. [Avoid privileged containers]()
 17. [Use a read-only filesystem in containers]()
 18. [Set resource requests and limits]()
@@ -64,7 +64,20 @@ Migrating to a new version should be treated with caution however as certain fea
 ## Use managed clusters
 
 Unless you have a large engineering department with teams already used to running open-source software as highly available services, then a managed Kubernetes service, either in the cloud or on-premise, will substantially lower its complexity by having fewer components to administer and upgrade.
-Depending on the type of hosted service you choose, your team won't have to deal with manually provisioning the control plane components, adding nodes to expand your cluster, or configuring the pods that support your containers.
+Depending on the type of hosted service you choose, your team won't have to deal with manually provisioning the [control plane components](https://kubernetes.io/docs/concepts/overview/components/#control-plane-components), adding nodes to expand your cluster, or configuring the pods that support your containers.
+
+## Use multiple nodes
+
+Running Kubernetes on a single node is not a good idea if you want to build in fault tolerance.
+Multiple nodes should be employed in your cluster so workloads can be spread between them.
+A Kubernetes cluster that handles production traffic should have a minimum of three nodes because if one node goes down, both an [etcd](https://kubernetes.io/docs/concepts/overview/components/#etcd) member and a control plane instance are lost, and redundancy is compromised.
+
+## Isolate nodes
+
+[Kubernetes nodes](https://kubernetes.io/docs/concepts/architecture/nodes/) must be on a separate network and should not be exposed directly to public networks.
+If possible, you should even avoid direct connections to the general corporate network.
+This is only possible if Kubernetes control and data traffic are isolated. Otherwise, both flow through the same pipe, and open access to the data plane implies open access to the control plane.
+Ideally, nodes should be configured with an ingress controller, set to only allow connections from the master node on the specified port through the network access control list.
 
 ## Use namespaces
 
@@ -129,12 +142,41 @@ YAML files allow you to store and version all your objects along with your code.
 You can easily roll back deployments if things go wrong. Just restore an earlier YAML file and reapply it.
 In addition, this model ensures your team can see the cluster's status and changes made to it over time.
 
+## Use network policies
+
+Use [network policies](https://kubernetes.io/docs/concepts/services-networking/network-policies/) to restrict access to services within a Kubernetes cluster.
+By default, all containers can talk to each other in the network, something that presents a security risk if malicious actors gain access to a container, allowing them to traverse objects in the cluster.
+Network policies can control traffic at the IP and port level, similar to the concept of security groups in cloud platforms to restrict access to resources.
+Typically, all traffic should be denied by default, then allow rules should be put in place to allow required traffic.
+You'll find several examples of network policies in the [Kubernetes Network Policy Recipes](https://github.com/ahmetb/kubernetes-network-policy-recipes/) repository.
+
+## Use a firewall
+
+You should put a firewall in front of your cluster to restrict requests to the API server from the outside world.
+IP addresses should be whitelisted, and open ports restricted.
+You can use regular firewalling rules or port firewalling rules. If you are using something like [Azure Kubernetes Service](https://azure.microsoft.com/products/kubernetes-service), [Google Kubernetes Engine](https://cloud.google.com/kubernetes-engine), or [Amazon Elastic Kubernetes Service](https://aws.amazon.com/eks/), then you can use the features provided by these public cloud providers.
+
+## Use process whitelisting
+
+Process whitelisting is an effective way to identify unexpected running processes.
+First, observe the application over a period of time to identify all processes running during normal application behaviour.
+Then use this list as your whitelist for future application behaviour.
+Suppose an attacker succeeds in getting access to your cluster and begins running a malicious process.
+In that case, you'll easily identify the user since it's a new non-whitelisted process.
+
 ## Avoid privileged containers
 
 Ensuring that a container can perform only a very limited set of operations is vital for production deployments.
 This is possible thanks to the use of non-root containers, which are executed by a user different from root.
 You can restrict the container capabilities to the minimal required set using [securityContext.capabilities.drop](https://kubernetes.io/docs/tasks/configure-pod-container/security-context/#set-capabilities-for-a-container) option.
 That way, in case your container is compromised, the range of action available to an attacker is limited.
+
+## Use a read-only filesystem in containers
+
+A read-only root filesystem helps to enforce an immutable infrastructure strategy.
+The container should only write on mounted volumes that can persist, even if the container exits.
+Using an immutable root filesystem and a verified boot mechanism prevents against attackers from "owning" the machine through permanent local changes.
+An immutable root filesystem can also prevent malicious binaries from writing to the host system.
 
 ## Set resource requests and limits
 
@@ -174,12 +216,38 @@ Although the deployments and container images change with new releases, the Conf
 [Reloader](https://github.com/stakater/Reloader) can watch changes in ConfigMap and Secret and do rolling upgrades on Pods with their associated DeploymentConfigs, Deployments, Daemonsets Statefulsets and Rollouts.
 Alternatively, [Helm sha256sum function](https://helm.sh/docs/howto/charts_tips_and_tricks/#automatically-roll-deployments) can be used to ensure a deployment's annotation section is updated if another file changes.
 
+## Use autoscaling
+
+Kubernetes lets you automate many management tasks, including provisioning and scaling.
+Instead of manually allocating resources, you can create automated processes that save time, allow you to respond quickly to spikes in demand, and conserve costs by scaling down when resources are not needed.
+Where it is appropriate, autoscaling can be employed to dynamically adjust the number of pods ([Horizontal Pod Autoscaling](https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/)), the amount of resources consumed by the pods ([Vertical Pod Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler)), or the number of nodes in the cluster ([Cluster Autoscaler](https://github.com/kubernetes/autoscaler/tree/master/cluster-autoscaler)), depending on the demand for the resources.
+
 ## Turn on audit logging
 
 Make sure that [audit logging](https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/) is enabled and you are monitoring unusual or unwanted API calls, especially authentication failures.
 Enabling audit logs is a standard security measure that can also be useful in day-to-day operations.
 With this feature, each action by an administrator is logged in a file for future reference.
 Tracing configuration changes to individual administrators in a multi-user platform can help track down and correct problematic usage patterns.
+
+## Monitor control plane components
+
+The control plane is the brain and heart of Kubernetes, It includes [kube-apiserver](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/), [etcd](https://kubernetes.io/docs/tasks/administer-cluster/configure-upgrade-etcd/), [kube-scheduler](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-scheduler/), [controller-manager](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/), [kubelet](https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/), [kube-proxy](https://kubernetes.io/docs/reference/command-line-tools-reference/kube-proxy/) and [DNS](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/). Monitoring the control plane helps identify vulnerabilities within the cluster.
+It is recommended using a robust, continuous, and automated Kubernetes monitoring tools rather than managing this manually.
+You'll also be able to monitor resource usage so you can optimize performance and costs.
+
+## Monitor disk usage
+
+Pods running on Kubernetes may claim a Persistent Volume to store data that last between Pod restarts.
+This volume is usually of limited size, so you need to monitor its storage and alert for low free space.
+You should regularly monitor all volumes associated with your cluster, as well as the root file system.
+With alert monitoring, you'll be able to take corrective actions either by scaling or freeing disk space when needed.
+
+## Monitor network traffic
+
+Containerized applications generally make extensive use of cluster networks.
+Observe active network traffic and compare it to the traffic allowed by Kubernetes network policy, to understand how your application interacts and identify anomalous communications.
+At the same time, if you compare active traffic to allowed traffic, you can identify network policies that are not actively used by cluster workloads.
+This information can be used to further strengthen the allowed network policy, removing unneeded connections to reduce the attack surface.
 
 ## Have an alert system
 
@@ -189,12 +257,41 @@ Alerts consists in alert rules and notification channel.
 Configure alerts to quickly get notified when the values exceed the expected thresholds.
 Use meaningful dashboards to explore the evolution of metrics and correlate with changes in other metrics and events happening in your system.
 
+## Externalise all configurations
+
+Configurations should be maintained outside the application code.
+This has several benefits. First, changing the configuration does not require recompiling the application.
+Second, the configuration can be updated when the application is running.
+Third, the same code can be used in different environments.
+In Kubernetes, the configuration can be saved in ConfigMaps, which can then be mounted into containers as volumes are passed in as environment variables. Save only non-sensitive configuration in ConfigMaps.
+For sensitive information (such as credentials), use the Secret resource.
+
 ## Lint manifest files
 
 Use a linter to avoid common mistakes and establish best practice guidelines that engineers can follow in an automated way.
 [KubeLinter](https://github.com/stackrox/kube-linter) and [Kubeval](https://github.com/instrumenta/kubeval/) can be used to parse Kubernetes YAML files and Helm charts, and are often used locally as part of a development workflow as well as in CI pipelines.
 You can supplement this analysis with vulnerability scanning.
 [kubeaudit](https://github.com/Shopify/kubeaudit) can be used to audit a manifest file before the manifest resources are deployed to the cluster.
+
+## Be proactive using Policy-as-Code
+
+You can take advantage of policy-as-code tools to scan configuration data and check if it conforms to the codified policies. [Kyverno](https://kyverno.io/) is a policy engine designed for Kubernetes.
+Kyverno allows cluster administrators to manage environment specific configurations independently of workload configurations and enforce configuration best practices for their clusters.
+Alternatively, you can use other tools like [Terrascan](https://runterrascan.io/) to scan configurations and flag any non-compliance for Infrastructure as Code.
+
+## Prefer stateless applications
+
+In general, stateless apps are easier to manage than stateful apps. With a stateless backend, development teams can make sure there aren't long-running connections that make scaling more challenging.
+Using stateless also enables developers to deploy applications more efficiently with zero downtime.
+Stateless applications make it easier to migrate and scale as and when required according to business needs.
+Ensure a smooth user experience by preserving the cluster for differentiated services and storing data separately.
+
+## Avoid databases on Kubernetes
+
+Databases require high input and output (I/O) throughput, which means that they need to rapidly read and write vast amounts of data to storage volumes.
+This means that databases can conflict with other applications when reading and writing to storage and experience performance bottlenecks. Kubernetes is ideal for hosting stateless applications that can scale horizontally via replication.
+Database workloads don't fit that workload profile and are a poor candidate as a Kubernetes workload.
+Dedicated virtual machines or managed database services offered by public cloud providers are the best solutions for delivering a database service.
 
 ## Use a version control system
 
@@ -217,14 +314,6 @@ It can also enhance error traceability and automate CI/CD workflows.
 Helm plays a vital role in making Kubernetes applications easier to build and test in a continuous integration and delivery pipeline.
 Alternatively, you can use [Kustomize](https://kustomize.io/), a template-free way to customize your application configuration.
 
-## Isolate Kubernetes nodes
-
-[Kubernetes Nodes](https://kubernetes.io/docs/concepts/architecture/nodes/) must be on a separate network and should not be exposed directly to public networks.
-If possible, you should even avoid direct connections to the general corporate network.
-This is only possible if Kubernetes control and data traffic are isolated.
-Otherwise, both flow through the same pipe, and open access to the data plane implies open access to the control plane.
-Ideally, Nodes should be configured with an ingress controller, set to only allow connections from the master node on the specified port through the network access control list.
-
 ## Lock down Kubelet
 
 The [kubelet](https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/) is an agent running on each node, which interacts with container runtime to launch pods and report metrics for nodes and pods.
@@ -240,6 +329,95 @@ It is a sensitive resource and an attractive target for attackers.
 If unauthorized users gain access to etcd they can take over the entire cluster.
 Read access is also dangerous because malicious users can use it to elevate privileges.
 It is recommended to protect etcd with TLS, firewall and encryption.
+
+## Restrict API access
+
+Most cloud-based Kubernetes implementations already limit access to the Kubernetes API of your cluster via the use of Identity and Access Management (IAM), Role-Based Access Control (RBAC), or Active Directory (AD).
+If your cluster doesn't already use one of these methods, you can typically configure one by using open-source projects to deal with different authentication methods.
+Additionally, access to the API should also be limited by the IP address, and access should only be provided to the trustworthy IPs.
+
+## Restrict SSH access
+
+It's an excellent practice to disallow SSH access to the Kubernetes nodes.
+This will lower the risk of unauthorized access to host resources on the cluster.
+Configure your nodes via your cloud provider to block access to port 22 except via your organization's VPN or a bastion host.
+You can also take advantage of Kubernetes authorization plugins to restrict user access to resources.
+You can even define access control rules for containers, namespaces, and operations.
+
+## Use Deployments instead of Pods
+
+A single pod should never be run individually. Avoid using naked pods as much as possible.
+To improve fault tolerance, instead, they should always be part of a Deployment, DaemonSet, ReplicaSet or StatefulSet.
+In the event of a node failure, naked pods can't be rescheduled because they're not bound to a Deployment or ReplicaSet.
+Pods can then be deployed across nodes using anti-affinity rules in your deployments to avoid all pods being run on a single node, which may cause downtime if it was to go down.
+Deploying is almost always more efficient than creating pods directly.
+
+## Define the risk tolerance in code
+
+Kubernetes functionality like [disruption budgets](https://kubernetes.io/docs/tasks/run-application/configure-pdb/), [Quality of Service](https://kubernetes.io/docs/tasks/configure-pod-container/quality-service-pod/) (QoS), [topology spread constraints](https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/), and [anti-affinity rules](https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#affinity-and-anti-affinity) give you control to define your tolerance to different kinds of application failure modes.
+These control features present many configuration options for managing workload placement.
+For example, you can prevent two pods from running on the same cluster node to protect against a single node outage which can lead to application downtime.
+You can also ensure that each cluster node gets one and only one pod to host a utility such as virus protection software.
+
+## Run more than one replica
+
+Pods are ephemeral by nature, if a Pod (or the node it executes on) fails, Kubernetes can automatically create a new replica of that Pod to continue operations.
+Keep in mind that Pod eviction from a node can happen at any time, and if only 1 replica exists, this would cause a service outage equivalent to the time it takes for a Pod to become available.
+Running more than one instance of your Pods guarantees that deleting a single Pod won't cause downtime.
+Even if you run several copies of your Pods, there are no guarantees that losing a node won't take down your service.
+You should apply anti-affinity rules to your Deployments so that Pods are spread across all the nodes of your cluster.
+
+## Set disruption budgets
+
+When a node is drained, all the Pods on that node are deleted and rescheduled.
+But suppose you have a heavy load, and you can't afford to lose over 50% of your Pods.
+In that case, you'll want to define a [Pod Disruption Budget](https://kubernetes.io/docs/tasks/run-application/configure-pdb/) to protect the Deployments from unexpected events that could cause unavailability.
+Doing this instructs Kubernetes to always prevent the drain event from deteriorating availability further when the final state results in less than the number of Pods you've specified for that Deployment.
+
+## Mount secrets as volumes
+
+Secrets can be mounted as volumes or exposed as environment variables and used by a container in a Pod to interact with external systems on your behalf.
+It is reasonably common for application code to log out its environment (particularly in the event of an error).
+This will include any secret values passed in as environment variables, so secrets can easily be exposed to any user or entity who has access to the logs.
+The content of Secret resources should be mounted into containers as volumes rather than passed in as environment variables.
+
+## Store secrets encrypted
+
+Secrets, like keys, passwords, tokens, and other configuration values, must be stored correctly.
+If our Kubernetes cluster is compromised, the Secrets must remain secure.
+[Kubernetes Secrets](https://kubernetes.io/docs/concepts/configuration/secret/) are encoded in base64 format and stored as plain text in [etcd](https://etcd.io/).
+Kubernetes does not provide robust mechanisms to encrypt, manage, and share secrets across a Kubernetes cluster.
+A common approach to getting more secure secret management on Kubernetes is to introduce an external secret management solution, such as [Vault](https://www.vaultproject.io/) or [Sealed Secrets](https://sealed-secrets.netlify.app/).
+
+## Set graceful shutdown
+
+In a Dockerized runtime like Kubernetes, containers are born and die frequently.
+This happens not only when errors are thrown but also for good reasons like relocating containers, replacing them with a newer version and more. It's achieved by sending a notice SIGTERM signal to the process with a 30 second grace period.
+If the timeout period passes, [kubelet](https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/) sends a SIGKILL signal, which causes the process to be stopped immediately.
+Make sure the app is handling the ongoing requests and clean-up resources in a timely fashion.
+You can always set a `terminationGracePeriodSeconds` on your pods to terminate containers with a specific grace period.
+
+## Application logs to stdout and stderr
+
+The standard output stream (stdout) is where you send application logs, and the standard error stream (stderr) is where you send error logs.
+Whenever an app writes to stdout or stderr, a container engine, like Docker, records, redirects, and stores the file in JSON format.
+Yet containers, pods, and nodes in Kubernetes are highly dynamic entities.
+These require consistent and persistent logs. So, it's best to keep cluster-wide logs on different backend storage such as the ELK Stack ([ElasticSearch](https://www.elastic.co/elasticsearch/), [Logstash](https://www.elastic.co/logstash/), and [Kibana](https://www.elastic.co/kibana/)).
+
+## Avoid sidecars for logging
+
+If you wish to apply log transformations to an application with a non-standard log event model, you may want to use a sidecar container.
+The sidecar approach deploys a separate logging agent for each Pod, which is relatively more resource intensive, but more flexible and multi-tenant isolated.
+However, if you have control over the application, you could output the right format.
+You could save on running an extra container for each Pod in your cluster.
+
+## Include PVCs in Pod configuration
+
+A  [PersistentVolume](https://kubernetes.io/docs/concepts/storage/persistent-volumes/) (PV) is an object that allows pods to access persistent storage on a storage device, defined via a [StorageClass](https://kubernetes.io/docs/concepts/storage/storage-classes/).
+Unlike regular volumes, which are transient in nature, PVs are persistent, supporting stateful application use cases.
+When creating a PersistentVolume, always configure a PersistentVolumeClaim (PVCs) as part of the container configuration.
+Avoid including PVs in container configuration as this strongly pairs a container to a particular volume.
+Always specify a default StorageClass, otherwise PVCs without a specific class will fail.
 
 ## Notes
 
