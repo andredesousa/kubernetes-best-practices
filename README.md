@@ -1,5 +1,8 @@
 # Kubernetes Best Practices
 
+Kubernetes, also known as K8s, is an open-source system for automating deployment, scaling, and management of containerized applications.
+These tips are based on books, articles and professional experience.
+
 ## Table of Contents
 
 1. [Use the latest version](#use-the-latest-version)
