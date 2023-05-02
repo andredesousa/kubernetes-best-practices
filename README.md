@@ -292,7 +292,8 @@ Ensure a smooth user experience by preserving the cluster for differentiated ser
 ## Avoid databases on Kubernetes
 
 Databases require high input and output (I/O) throughput, which means that they need to rapidly read and write vast amounts of data to storage volumes.
-This means that databases can conflict with other applications when reading and writing to storage and experience performance bottlenecks. Kubernetes is ideal for hosting stateless applications that can scale horizontally via replication.
+Databases often have high availability requirements, which can be difficult to achieve in a containerized environment.
+Kubernetes is ideal for hosting stateless applications that can scale horizontally via replication.
 Database workloads don't fit that workload profile and are a poor candidate as a Kubernetes workload.
 Dedicated virtual machines or managed database services offered by public cloud providers are the best solutions for delivering a database service.
 
